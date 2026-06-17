@@ -9,7 +9,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from .browser import DouyinBrowser
+from .browser import DouyinBrowser, clear_browser_profile
 from .config import RunnerConfig, load_config
 from .logging_utils import JsonlLogger
 from .messages import MessageGenerator
@@ -24,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(args.config)
         if args.command == "login":
             return login(config)
+        if args.command == "check-login":
+            return check_login(config)
+        if args.command == "logout":
+            return logout(config)
         if args.command == "contacts":
             return contacts(config, output=args.output)
         if args.command == "send-once":
@@ -44,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("login", help="open browser for manual Douyin login")
+    subparsers.add_parser("check-login", help="check whether the saved browser profile is logged in")
+    subparsers.add_parser("logout", help="move the saved browser profile aside so another account can log in")
 
     contacts_parser = subparsers.add_parser("contacts", help="discover visible/recent chat contacts")
     contacts_parser.add_argument("--output", choices=("json", "table"), default="table")
@@ -56,11 +62,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 def login(config: RunnerConfig) -> int:
     with DouyinBrowser(config) as browser:
-        browser.open_login_page()
+        browser.open_chat()
         screenshot = browser.screenshot("login-qr")
         print(f"Login page screenshot saved: {screenshot}")
-        print("Scan/login manually, then press Enter here to close and save profile.")
+        print("Browser opened. Scan/login manually, then press Enter here to close and save profile.")
         input()
+    return 0
+
+
+def check_login(config: RunnerConfig) -> int:
+    with DouyinBrowser(config) as browser:
+        logged_in = browser.ensure_logged_in()
+        screenshot = browser.screenshot("check-login")
+    if logged_in:
+        print(f"logged_in=true screenshot={screenshot}")
+        return 0
+    print(f"logged_in=false screenshot={screenshot}")
+    return 2
+
+
+def logout(config: RunnerConfig) -> int:
+    backup = clear_browser_profile(config)
+    if backup is None:
+        print(f"No browser profile found at {config.browser_profile_dir}; already logged out.")
+        return 0
+    print(f"Moved browser profile to {backup}. Run `douyin-spark login` to log in with another account.")
     return 0
 
 
@@ -87,6 +113,12 @@ def send_once(config: RunnerConfig, *, dry_run: bool, force: bool) -> int:
     generator = MessageGenerator(config.messages)
 
     with DouyinBrowser(config) as browser:
+        if not browser.ensure_logged_in():
+            screenshot = browser.screenshot("not-logged-in")
+            logger.write("not_logged_in", dry_run=dry_run, screenshot=str(screenshot))
+            print(json.dumps({"status": "not_logged_in", "screenshot": str(screenshot)}, ensure_ascii=False, indent=2))
+            return 0
+
         discovered = browser.discover_contacts()
         decisions = plan_recipients(
             discovered,

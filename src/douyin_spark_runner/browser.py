@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 from playwright.sync_api import BrowserContext, Error, Page, sync_playwright
 
@@ -84,6 +85,8 @@ class DouyinBrowser(AbstractContextManager["DouyinBrowser"]):
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=45_000)
                 page.wait_for_timeout(2_000)
+                if self.is_logged_in():
+                    return page
                 if _first_visible(page, LIST_SELECTORS + CONTACT_SELECTORS, timeout=8_000):
                     return page
             except Error as exc:
@@ -91,6 +94,25 @@ class DouyinBrowser(AbstractContextManager["DouyinBrowser"]):
         if last_error:
             raise RuntimeError(f"Could not open Douyin chat: {last_error}") from last_error
         return page
+
+    def is_logged_in(self) -> bool:
+        page = self._page()
+        try:
+            if page.locator("text=登录").first.is_visible(timeout=1_000):
+                return False
+        except Error:
+            pass
+        if _first_visible(page, LIST_SELECTORS + CONTACT_SELECTORS, timeout=3_000):
+            return True
+        try:
+            cookies = self.context.cookies() if self.context else []
+        except Error:
+            cookies = []
+        return any(cookie.get("name") == "sessionid" and cookie.get("value") for cookie in cookies)
+
+    def ensure_logged_in(self) -> bool:
+        self.open_chat()
+        return self.is_logged_in()
 
     def discover_contacts(self, *, limit: int = 80) -> list[Contact]:
         page = self._page()
@@ -159,6 +181,15 @@ class DouyinBrowser(AbstractContextManager["DouyinBrowser"]):
         if self.page is None:
             raise RuntimeError("Browser is not open")
         return self.page
+
+
+def clear_browser_profile(config: RunnerConfig) -> Path | None:
+    profile_dir = config.browser_profile_dir
+    if not profile_dir.exists():
+        return None
+    backup = profile_dir.with_name(f"{profile_dir.name}-logout-{datetime.now():%Y%m%d-%H%M%S}")
+    shutil.move(str(profile_dir), str(backup))
+    return backup
 
 
 def _first_visible(page: Page, selectors: tuple[str, ...], *, timeout: int):

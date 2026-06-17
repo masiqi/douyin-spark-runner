@@ -25,10 +25,18 @@ Then help the user edit `config.yaml`:
 4. Add `aliases` when Douyin nicknames differ from real-life names.
 5. Run `contacts` and `send-once --dry-run` before any real send.
 
+- `login` saves a local browser profile after the user scans the QR code.
+- `check-login` verifies whether that saved profile is still logged in.
+- `logout` moves the saved browser profile aside so a different Douyin account can log in.
+- `contacts` lists visible/recent chat contacts.
+- `send-once` checks login state first; if not logged in, it prints `not_logged_in` and exits without sending.
+
 Commands:
 
 ```bash
 uv run douyin-spark login                 # first-time browser login
+uv run douyin-spark check-login           # verify saved login state
+uv run douyin-spark logout                # switch accounts by clearing saved profile
 uv run douyin-spark contacts              # list visible/recent contacts
 uv run douyin-spark contacts --output json
 uv run douyin-spark send-once --dry-run   # plan only, do not send
@@ -157,6 +165,29 @@ screenshots/YYYYMMDD-HHMMSS-login-qr.png
 ```
 
 An agent can send that image to the user through the chat platform, wait for the user to scan it, then press Enter / submit newline to the waiting process.
+
+## Check login
+
+```bash
+uv run douyin-spark check-login
+```
+
+Exit code meanings:
+
+- `0`: logged in.
+- `2`: not logged in.
+- `1`: command error.
+
+`send-once` runs this check internally before sending. If login state is missing/expired, it exits without sending and writes a `not_logged_in` log entry.
+
+## Switch accounts / logout
+
+```bash
+uv run douyin-spark logout
+uv run douyin-spark login
+```
+
+`logout` does not call Douyin's website logout button. It safely moves the local persistent browser profile to a timestamped backup such as `state/browser-profile-logout-YYYYMMDD-HHMMSS`. The next `login` starts with a fresh browser profile, so another account can scan the QR code.
 
 ## Discover contacts
 

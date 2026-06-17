@@ -1,0 +1,56 @@
+# Copy to config.yaml and adjust locally. Do not commit real config.
+
+max_recipients: 10
+include: []
+exclude:
+  - "群"
+  - "老师"
+  - "家长"
+  - "工作"
+  - "老板"
+  - "客服"
+  - "官方"
+  - "通知"
+
+# 抖音昵称 -> 日常称呼。消息里使用这里的称呼；没配置则默认使用抖音昵称。
+# 例如：抖音昵称叫“疯狂的兔子”，但平时叫他“三儿”。
+aliases:
+  "疯狂的兔子": "三儿"
+  "张三的抖音昵称": "张三"
+
+skip_groups: true
+
+state_dir: "state"
+log_dir: "logs"
+screenshot_dir: "screenshots"
+browser_profile_dir: "state/browser-profile"
+
+headless: false
+slow_mo_ms: 50
+
+random_sleep:
+  min_seconds: 4
+  max_seconds: 12
+
+messages:
+  templates:
+    - "早呀 {name}，今天也顺顺利利 {emoji}"
+    - "{name}，路过打个招呼，续一下火花 {emoji}"
+    - "给 {name} 补个火花，{phrase}"
+    - "哈喽 {name}，今天也保持联系 {emoji}"
+    - "{name} 今天加油，火花别断啦 {emoji}"
+    - "早～{name}，祝今天顺利 {emoji}"
+    - "{name}，冒个泡，续火花啦 {emoji}"
+    - "今天也来和 {name} 打个招呼 {emoji}"
+  emojis:
+    - "🙂"
+    - "✨"
+    - "🌿"
+    - "☀️"
+    - "🙌"
+  phrases:
+    - "今天也保持联系"
+    - "路过打个招呼"
+    - "补一下火花"
+    - "祝今天顺利"
+    - "记得休息一下"

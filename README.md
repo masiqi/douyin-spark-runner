@@ -1,6 +1,6 @@
 # douyin-spark-runner
 
-[中文说明](README_zh.md)
+[English](README.md) | [中文](README_zh.md)
 
 Local Playwright runner for maintaining Douyin chat “spark / streak” interactions from a desktop browser.
 

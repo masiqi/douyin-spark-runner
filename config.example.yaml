@@ -19,6 +19,7 @@ aliases:
   "张三的抖音昵称": "张三"
 
 skip_groups: true
+require_spark: true
 
 state_dir: "state"
 log_dir: "logs"

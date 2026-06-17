@@ -8,7 +8,7 @@ import shutil
 from playwright.sync_api import BrowserContext, Error, Page, sync_playwright
 
 from .config import RunnerConfig
-from .contacts import Contact, looks_like_group
+from .contacts import Contact, detect_spark_text, looks_like_group
 
 
 CHAT_URLS = ("https://www.douyin.com/chat", "https://www.douyin.com/im")
@@ -135,12 +135,15 @@ class DouyinBrowser(AbstractContextManager["DouyinBrowser"]):
                 except Error:
                     continue
                 seen.add(name)
+                spark_text = detect_spark_text(name, subtitle)
                 contacts.append(
                     Contact(
                         name=name,
                         selector_index=index,
                         subtitle=subtitle,
                         is_group=looks_like_group(name, subtitle),
+                        has_spark=bool(spark_text),
+                        spark_text=spark_text,
                     )
                 )
             if contacts:

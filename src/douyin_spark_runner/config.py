@@ -27,6 +27,7 @@ class RunnerConfig:
     exclude: list[str] = field(default_factory=list)
     aliases: dict[str, str] = field(default_factory=dict)
     skip_groups: bool = True
+    require_spark: bool = True
     state_dir: Path = Path("state")
     log_dir: Path = Path("logs")
     screenshot_dir: Path = Path("screenshots")
@@ -54,6 +55,7 @@ def load_config(path: Path | str = Path("config.yaml")) -> RunnerConfig:
         exclude=_string_list(raw.get("exclude", []), "exclude"),
         aliases=_string_dict(raw.get("aliases", {}), "aliases"),
         skip_groups=bool(raw.get("skip_groups", True)),
+        require_spark=bool(raw.get("require_spark", True)),
         state_dir=Path(raw.get("state_dir", "state")),
         log_dir=Path(raw.get("log_dir", "logs")),
         screenshot_dir=Path(raw.get("screenshot_dir", "screenshots")),

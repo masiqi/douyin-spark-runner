@@ -169,6 +169,8 @@ def _message_plan(
                 "display_name": display_name,
                 "selector_index": decision.contact.selector_index,
                 "is_group": decision.contact.is_group,
+                "has_spark": decision.contact.has_spark,
+                "spark_text": decision.contact.spark_text,
                 "should_send": decision.should_send,
                 "reason": decision.reason,
                 "message": message,
@@ -183,9 +185,9 @@ def _sleep(config: RunnerConfig) -> None:
 
 
 def _print_contacts_table(discovered) -> None:  # type: ignore[no-untyped-def]
-    print(f"{'INDEX':>5}  {'GROUP':>5}  NAME")
+    print(f"{'INDEX':>5}  {'GROUP':>5}  {'SPARK':>5}  NAME")
     for contact in discovered:
-        print(f"{contact.selector_index:>5}  {str(contact.is_group):>5}  {contact.name}")
+        print(f"{contact.selector_index:>5}  {str(contact.is_group):>5}  {str(contact.has_spark):>5}  {contact.name}")
 
 
 if __name__ == "__main__":

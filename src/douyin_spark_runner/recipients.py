@@ -37,6 +37,9 @@ def plan_recipients(
         if config.skip_groups and contact.is_group:
             decisions.append(RecipientDecision(contact, False, "group"))
             continue
+        if config.require_spark and not contact.has_spark:
+            decisions.append(RecipientDecision(contact, False, "no_spark"))
+            continue
         if not force and contact.name in already_sent:
             decisions.append(RecipientDecision(contact, False, "already_sent"))
             continue

@@ -15,6 +15,7 @@ def test_plan_recipients_applies_include_exclude_groups_daily_and_cap() -> None:
         include=["阿", "小李"],
         exclude=["工作"],
         skip_groups=True,
+        require_spark=False,
     )
     contacts = [
         Contact(name="阿明", selector_index=0),
@@ -42,7 +43,7 @@ def test_plan_recipients_applies_include_exclude_groups_daily_and_cap() -> None:
 
 
 def test_plan_recipients_force_ignores_daily_state() -> None:
-    config = RunnerConfig(max_recipients=10)
+    config = RunnerConfig(max_recipients=10, require_spark=False)
     contacts = [Contact(name="阿明", selector_index=0)]
 
     decisions = plan_recipients(

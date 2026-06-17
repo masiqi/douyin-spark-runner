@@ -6,5 +6,6 @@ config.yaml
 state/
 logs/
 screenshots/
+scripts/run_daily.sh
 playwright-report/
 .pytest_cache/

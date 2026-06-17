@@ -1,5 +1,7 @@
 # douyin-spark-runner
 
+[中文说明](README_zh.md)
+
 Local Playwright runner for maintaining Douyin chat “spark / streak” interactions from a desktop browser.
 
 It does **not** use Android automation, mobile-device control, GitHub Actions cookies, or the Douyin mobile app. It opens Douyin Web on the local machine, discovers recent chat contacts, sends randomized natural messages to eligible contacts, records daily send state, saves logs/screenshots, then exits.

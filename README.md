@@ -1,126 +1,265 @@
 # douyin-spark-runner
 
-本项目是在 macOS 本机运行的 Playwright 抖音网页版续火花 runner。它不使用 Android、手机自动化、GitHub Actions cookie，也不会要求安装抖音移动端。设计目标是每天由 Hermes/cron 启动一次浏览器，读取网页版聊天列表，给符合规则的可见/近期联系人发送随机自然消息，保存日志和截图后退出。
+Local Playwright runner for maintaining Douyin chat “spark / streak” interactions from a desktop browser.
 
-默认策略偏保守：每天最多发送 20 人、跳过疑似群聊、支持排除名单、支持 include 白名单、记录当天已发送联系人，重复运行时不会再次发送，除非显式使用 `--force`。
+It does **not** use Android automation, mobile-device control, GitHub Actions cookies, or the Douyin mobile app. It opens Douyin Web on the local machine, discovers recent chat contacts, sends randomized natural messages to eligible contacts, records daily send state, saves logs/screenshots, then exits.
 
-## 安装
+> Safety first: default behavior is conservative. Always run `send-once --dry-run` before real sending.
 
-需要 Python 3.11+ 和 `uv`。
+## Agent Quick Start
+
+If you are an AI coding/ops agent and the user gives you this repository URL, follow these steps exactly.
+
+```bash
+git clone https://github.com/masiqi/douyin-spark-runner.git
+cd douyin-spark-runner
+uv sync --extra dev
+cp config.example.yaml config.yaml
+```
+
+Then help the user edit `config.yaml`:
+
+1. Set `max_recipients` conservatively, e.g. `10`.
+2. Keep `skip_groups: true` unless the user explicitly wants groups.
+3. Add exclusions for shops, courses, customer service, official accounts, or any contact that should never receive messages.
+4. Add `aliases` when Douyin nicknames differ from real-life names.
+5. Run `contacts` and `send-once --dry-run` before any real send.
+
+Commands:
+
+```bash
+uv run douyin-spark login                 # first-time browser login
+uv run douyin-spark contacts              # list visible/recent contacts
+uv run douyin-spark contacts --output json
+uv run douyin-spark send-once --dry-run   # plan only, do not send
+uv run douyin-spark send-once             # real send
+```
+
+Never run `send-once` until the user has reviewed a dry-run plan.
+
+## Is this a skill?
+
+This repository is primarily a **CLI automation tool**, not a Hermes/Claude/OpenAI skill by itself.
+
+However, it is intentionally documented in an agent-friendly way so an agent can install and operate it from the GitHub URL alone. A separate thin skill can be created later that simply teaches an agent:
+
+- where to clone/install this repo,
+- how to run `login`, `contacts`, `send-once --dry-run`, and `send-once`,
+- how to configure a Hermes cron job.
+
+In other words:
+
+- **This repo** = executable implementation.
+- **Optional skill** = procedural wrapper/instructions for agents.
+
+## What it does
+
+1. Opens Douyin Web chat using Playwright.
+2. Uses a persistent local browser profile under `state/browser-profile`.
+3. Discovers visible/recent chat contacts.
+4. Filters contacts by:
+   - include list,
+   - exclude list,
+   - group heuristic,
+   - daily already-sent state,
+   - `max_recipients` cap.
+5. Generates varied natural messages using templates.
+6. Supports nickname aliases so messages use real-life names instead of Douyin display names.
+7. Sends messages one by one with random pauses.
+8. Saves JSONL logs, screenshots, and daily send records.
+
+## Requirements
+
+- macOS/Linux desktop environment with a browser available.
+- Python 3.11+.
+- [`uv`](https://github.com/astral-sh/uv).
+- Chrome is recommended.
+
+Install dependencies:
 
 ```bash
 uv sync --extra dev
 ```
 
-如果本机已经安装 Chrome，Playwright 会优先使用系统 Chrome，不需要安装浏览器二进制。只有在本机没有可用 Chrome 或 Playwright 提示缺浏览器时，再运行：
+If local Chrome is unavailable or Playwright complains about a missing browser:
 
 ```bash
 uv run playwright install chromium
 ```
 
-## 配置
+## Configuration
 
-复制示例配置到本地配置文件：
+Create local config:
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-`config.yaml` 已被 `.gitignore` 忽略，不要提交真实配置。常用字段：
+`config.yaml` is ignored by git. Do not commit real local configuration.
 
-- `max_recipients`: 单次最多发送人数，建议保持 20 或更低。
-- `include`: 非空时只发送名称命中这些字符串或正则的联系人。
-- `exclude`: 名称命中这些字符串或正则的联系人会跳过。
-- `aliases`: 抖音昵称到日常称呼的映射；消息里使用映射后的称呼，未配置时使用抖音昵称。
-- `skip_groups`: 是否跳过疑似群聊，默认 `true`。
-- `random_sleep`: 每次发送后的随机等待秒数。
-- `messages.templates`: 随机消息模板，支持 `{name}`、`{date}`、`{emoji}`、`{phrase}`。
+Important fields:
 
-浏览器登录态保存在 `state/browser-profile`，当天发送记录保存在 `state/daily/YYYY-MM-DD.json`，日志和截图分别在 `logs/`、`screenshots/`。
+```yaml
+max_recipients: 10
+include: []
+exclude:
+  - "群"
+  - "老师"
+  - "家长"
+  - "工作"
+  - "客服"
+  - "官方"
+skip_groups: true
 
-## 登录
+# Douyin nickname -> everyday name used in messages.
+# If absent, the Douyin nickname is used.
+aliases:
+  "疯狂的兔子": "三儿"
+  "张三的抖音昵称": "张三"
 
-首次运行需要手动扫码登录：
+random_sleep:
+  min_seconds: 4
+  max_seconds: 12
+
+messages:
+  templates:
+    - "早呀 {name}，今天也顺顺利利 {emoji}"
+    - "{name}，路过打个招呼，续一下火花 {emoji}"
+    - "给 {name} 补个火花，{phrase}"
+```
+
+Template variables:
+
+- `{name}`: alias value if configured, otherwise Douyin nickname.
+- `{date}`: current date.
+- `{emoji}`: random emoji from config.
+- `{phrase}`: random phrase from config.
+
+Runtime paths:
+
+- Browser profile: `state/browser-profile`
+- Daily sent state: `state/daily/YYYY-MM-DD.json`
+- Logs: `logs/*.jsonl`
+- Screenshots: `screenshots/*.png`
+
+## First login
 
 ```bash
 uv run douyin-spark login
 ```
 
-命令会打开非 headless Chrome 并进入抖音聊天页。手动扫码登录完成后，回到终端按 Enter，浏览器 profile 会保存到本机 `state/browser-profile`。
+The command opens a non-headless browser and navigates to Douyin Web chat. Complete QR/login in the browser, then return to the terminal and press Enter. The browser profile is saved locally.
 
-## 查看联系人
+For remote/macOS-headless-by-chat scenarios, the command saves a screenshot such as:
 
-只发现聊天列表中的可见/近期联系人，不发送消息：
+```text
+screenshots/YYYYMMDD-HHMMSS-login-qr.png
+```
+
+An agent can send that image to the user through the chat platform, wait for the user to scan it, then press Enter / submit newline to the waiting process.
+
+## Discover contacts
 
 ```bash
 uv run douyin-spark contacts
 uv run douyin-spark contacts --output json
 ```
 
-该命令会打开网页版抖音聊天页，读取当前聊天列表，并保存一张截图。
+This opens Douyin Web chat, reads visible/recent contacts, and saves a screenshot. Use this output to adjust `include`, `exclude`, and `aliases`.
 
-##  dry-run 计划
-
-发送前先看计划，推荐每天实际发送前都跑一次：
+## Dry-run plan
 
 ```bash
 uv run douyin-spark send-once --dry-run
 ```
 
-dry-run 会输出本次计划：联系人、是否发送、跳过原因、为每个 eligible 联系人生成的随机消息。dry-run 不会点击发送，不会写入当天已发送记录。
+Dry-run opens the chat page and prints a plan, but does not send messages and does not mark contacts as sent.
 
-## 发送一次
+Example output item:
 
-确认 dry-run 输出无误后再运行：
+```json
+{
+  "name": "疯狂的兔子",
+  "display_name": "三儿",
+  "selector_index": 0,
+  "is_group": false,
+  "should_send": true,
+  "reason": "eligible",
+  "message": "三儿，路过打个招呼，续一下火花 ✨"
+}
+```
+
+Meanings:
+
+- `name`: actual Douyin display name, used for locating the chat.
+- `display_name`: configured alias, used in the generated message.
+- `reason`: why the contact is eligible or skipped.
+
+## Send once
+
+Only after reviewing dry-run:
 
 ```bash
 uv run douyin-spark send-once
 ```
 
-发送逻辑会：
+The runner will:
 
-1. 打开 `https://www.douyin.com/chat`，失败时回退到 `https://www.douyin.com/im`。
-2. 发现聊天列表联系人。
-3. 根据 include/exclude、群聊判断、当天已发送记录和 `max_recipients` 过滤。
-4. 为每个联系人生成不同消息。
-5. 逐个点击联系人、输入消息、按 Enter。
-6. 每次发送后随机等待，并写入日志和 `state/daily/YYYY-MM-DD.json`。
-7. 失败或结束时保存截图。
+1. Open `https://www.douyin.com/chat` with fallback to `https://www.douyin.com/im`.
+2. Discover contacts.
+3. Filter recipients.
+4. Generate unique-ish randomized messages.
+5. Click each contact, type the message, press Enter.
+6. Wait a random interval between sends.
+7. Record sent contacts in daily state.
+8. Save screenshots/logs.
 
-如果确实需要忽略当天记录，可以使用：
+To ignore today’s already-sent state:
 
 ```bash
 uv run douyin-spark send-once --force
 ```
 
-谨慎使用 `--force`，它可能让同一天重复发送给同一联系人。
+Use `--force` carefully. It can send multiple times to the same contact on the same day.
 
-## Hermes/cron 示例
+## Hermes cron example
 
-建议定时任务先跑 dry-run 一段时间观察日志，再切到真实发送。
+After manual dry-runs are stable, a Hermes cron/no-agent shell job or ordinary cron can run it daily.
+
+Ordinary cron example:
 
 ```cron
 15 9 * * * cd /Users/siqi/projects/douyin-spark-runner && UV_CACHE_DIR=.uv-cache uv run douyin-spark send-once >> logs/cron.log 2>&1
 ```
 
-如果 Hermes 支持环境变量，也建议设置：
+For Hermes Agent, a scheduled job can run this command from the repo workdir. Keep the prompt/script self-contained and start with dry-run during trial periods.
+
+## Safety notes
+
+- This is browser automation against Douyin Web; DOM changes can break selectors.
+- It may violate platform automation expectations; use only for personal, low-volume use.
+- Keep `max_recipients` low.
+- Keep `random_sleep` non-zero.
+- Always review `contacts` and `send-once --dry-run` after changing config.
+- Group detection is heuristic. Use `exclude` for important safeguards.
+- Do not commit `config.yaml`, `state/`, `logs/`, or `screenshots/`.
+
+## Development
+
+Run tests:
 
 ```bash
-UV_CACHE_DIR=/Users/siqi/projects/douyin-spark-runner/.uv-cache
+uv run pytest
 ```
 
-## 安全提醒
+Tests are offline. They do not access Douyin and do not send messages.
 
-- 本工具只面向本机个人使用，不保证抖音网页版 DOM 长期稳定。
-- 不要在测试或 CI 中运行真实发送命令。
-- `send-once --dry-run` 是离线计划模式中的安全检查，但仍会打开浏览器访问抖音网页版。
-- 单次发送人数和等待时间应保持保守，避免高频自动化行为。
-- 群聊识别是启发式规则，发送前请用 `contacts` 和 dry-run 检查。
-
-## 测试
-
-单元测试不访问抖音，也不会发送消息：
+Run syntax check:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run pytest
+python -m compileall -q src tests
 ```
+
+## Public repository
+
+https://github.com/masiqi/douyin-spark-runner
